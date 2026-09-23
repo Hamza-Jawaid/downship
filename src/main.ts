@@ -1,5 +1,7 @@
 import './style.css';
 import { Application, Assets, Sprite, Graphics } from 'pixi.js';
+import gunmanSvgUrl from './assets/gunman/gunman.svg';
+import ufoSvgUrl from './assets/ufo/ufo.svg';
 
 (async () => {
   // Create a new application
@@ -15,8 +17,8 @@ import { Application, Assets, Sprite, Graphics } from 'pixi.js';
   document.body.appendChild(app.canvas);
 
   // Load the textures
-  const gunmanTexture = await Assets.load('/src/assets/gunman/gunman.svg');
-  const ufoTexture = await Assets.load('/src/assets/ufo/ufo.svg');
+  const gunmanTexture = await Assets.load(gunmanSvgUrl);
+  const ufoTexture = await Assets.load(ufoSvgUrl);
 
   // Create and setup the player sprite
   const player = new Sprite(gunmanTexture);
