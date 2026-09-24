@@ -29,11 +29,11 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
   app.stage.addChild(playerContainer);
 
   const playerLower = new Sprite(gunmanLowerTexture);
-  playerLower.anchor.set(0.3, 0.65);
+  playerLower.anchor.set(0.245, 0.5725);
   playerContainer.addChild(playerLower);
 
   const playerUpper = new Sprite(gunmanUpperTexture);
-  playerUpper.anchor.set(0.3, 0.65);
+  playerUpper.anchor.set(0.245, 0.5725);
   playerContainer.addChild(playerUpper);
 
   // Handle window resizing to keep player at bottom-left
@@ -145,7 +145,7 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
       laser.graphics.visible = true;
 
       // Calculate starting position (at the gun barrel, roughly offset by player's rotation)
-      // Since the anchor is (0.3, 0.65), we can estimate the barrel position:
+      // Since the anchor is (0.245, 0.5725), we can estimate the barrel position:
       const barrelDistance = 100 * playerContainer.scale.x; // approximate distance to barrel
       const startX = playerContainer.x + Math.cos(playerUpper.rotation) * barrelDistance;
       const startY = playerContainer.y + Math.sin(playerUpper.rotation) * barrelDistance;
