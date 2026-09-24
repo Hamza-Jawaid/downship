@@ -24,8 +24,8 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
 
   // Create and setup the player container
   const playerContainer = new Container();
-  playerContainer.scale.set(0.4);
-  playerContainer.position.set(50, app.canvas.height);
+  playerContainer.scale.set(0.8);
+  playerContainer.position.set(50, app.canvas.height - 50);
   app.stage.addChild(playerContainer);
 
   const playerLower = new Sprite(gunmanLowerTexture);
@@ -38,7 +38,7 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
 
   // Handle window resizing to keep player at bottom-left
   window.addEventListener('resize', () => {
-    playerContainer.position.set(50, app.canvas.height);
+    playerContainer.position.set(50, app.canvas.height - 50);
   });
 
   // Mouse tracking logic for rotation
