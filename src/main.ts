@@ -3,7 +3,6 @@ import { Application, Assets, Sprite, Graphics, Container, Text } from 'pixi.js'
 import gunmanUpperUrl from './assets/gunman/gunman_upper.svg';
 import gunmanLowerUrl from './assets/gunman/gunman_lower.svg';
 import ufoSvgUrl from './assets/ufo/ufo.svg';
-import topBackUrl from './assets/gunman/top-back.svg';
 
 (async () => {
   // Create a new application
@@ -22,7 +21,6 @@ import topBackUrl from './assets/gunman/top-back.svg';
   const gunmanUpperTexture = await Assets.load(gunmanUpperUrl);
   const gunmanLowerTexture = await Assets.load(gunmanLowerUrl);
   const ufoTexture = await Assets.load(ufoSvgUrl);
-  const topBackTexture = await Assets.load(topBackUrl);
 
   // Create and setup the player container
   const playerContainer = new Container();
@@ -149,17 +147,16 @@ import topBackUrl from './assets/gunman/top-back.svg';
       // Calculate starting position (at the gun barrel, roughly offset by player's rotation)
       // Since the anchor is (0.245, 0.5725), we can estimate the barrel position:
       const barrelDistance = 100 * playerContainer.scale.x; // approximate distance to barrel
-      let effectiveRotation = playerUpper.texture === topBackTexture ? playerUpper.rotation - Math.PI / 2 : playerUpper.rotation;
-      const startX = playerContainer.x + Math.cos(effectiveRotation) * barrelDistance;
-      const startY = playerContainer.y + Math.sin(effectiveRotation) * barrelDistance;
+      const startX = playerContainer.x + Math.cos(playerUpper.rotation) * barrelDistance;
+      const startY = playerContainer.y + Math.sin(playerUpper.rotation) * barrelDistance;
 
       laser.graphics.x = startX;
       laser.graphics.y = startY;
-      laser.graphics.rotation = effectiveRotation;
+      laser.graphics.rotation = playerUpper.rotation;
 
       // Set velocity
-      laser.vx = Math.cos(effectiveRotation) * LASER_SPEED;
-      laser.vy = Math.sin(effectiveRotation) * LASER_SPEED;
+      laser.vx = Math.cos(playerUpper.rotation) * LASER_SPEED;
+      laser.vy = Math.sin(playerUpper.rotation) * LASER_SPEED;
     }
   });
 
@@ -178,33 +175,8 @@ import topBackUrl from './assets/gunman/top-back.svg';
   app.ticker.add((time) => {
     const currentMs = performance.now();
 
-    // Swap texture when looking up/back (e.g. angle < -Math.PI / 4)
-    // The player is at bottom left, aiming at top right/top left
-    // 0 is right, -PI/2 is straight up.
-    let isAimingUp = targetAngle < -Math.PI / 6 && targetAngle > -Math.PI;
-    if (isAimingUp) {
-        if (playerUpper.texture !== topBackTexture) {
-            playerUpper.texture = topBackTexture;
-            playerUpper.anchor.set(0.54, 0.85); // Adjust anchor for the vertical orientation of top-back
-            playerUpper.rotation += Math.PI / 2; // Immediately adjust rotation to prevent spinning effect
-        }
-    } else {
-        if (playerUpper.texture !== gunmanUpperTexture) {
-            playerUpper.texture = gunmanUpperTexture;
-            playerUpper.anchor.set(0.245, 0.5725);
-            playerUpper.rotation -= Math.PI / 2; // Immediately adjust rotation to prevent spinning effect
-        }
-    }
-
-    // Calculate correct rotation for the texture orientation
-    let displayAngle = isAimingUp ? targetAngle + Math.PI / 2 : targetAngle;
-
     // Smooth movement for playerUpper
-    // Calculate the difference and normalize to [-PI, PI]
-    let diff = displayAngle - playerUpper.rotation;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    playerUpper.rotation += diff * 0.1 * time.deltaTime;
+    playerUpper.rotation += (targetAngle - playerUpper.rotation) * 0.05 * time.deltaTime;
 
     const elapsedMs = currentMs - gameStartTime;
 
