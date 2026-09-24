@@ -1,6 +1,7 @@
 import './style.css';
-import { Application, Assets, Sprite, Graphics } from 'pixi.js';
-import gunmanSvgUrl from './assets/gunman/gunman.svg';
+import { Application, Assets, Sprite, Graphics, Container, Text } from 'pixi.js';
+import gunmanUpperUrl from './assets/gunman/gunman_upper.svg';
+import gunmanLowerUrl from './assets/gunman/gunman_lower.svg';
 import ufoSvgUrl from './assets/ufo/ufo.svg';
 
 (async () => {
@@ -17,27 +18,27 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
   document.body.appendChild(app.canvas);
 
   // Load the textures
-  const gunmanTexture = await Assets.load(gunmanSvgUrl);
+  const gunmanUpperTexture = await Assets.load(gunmanUpperUrl);
+  const gunmanLowerTexture = await Assets.load(gunmanLowerUrl);
   const ufoTexture = await Assets.load(ufoSvgUrl);
 
-  // Create and setup the player sprite
-  const player = new Sprite(gunmanTexture);
+  // Create and setup the player container
+  const playerContainer = new Container();
+  playerContainer.scale.set(0.4);
+  playerContainer.position.set(50, app.canvas.height);
+  app.stage.addChild(playerContainer);
 
-  // Adjust scaling if the original SVG is too large
-  player.scale.set(0.2);
+  const playerLower = new Sprite(gunmanLowerTexture);
+  playerLower.anchor.set(0.3, 0.65);
+  playerContainer.addChild(playerLower);
 
-  // Set anchor near the character's torso/shoulder
-  player.anchor.set(0.2, 0.8);
-
-  // Position at bottom-left corner
-  player.position.set(0, app.canvas.height);
-
-  // Add the player to the stage
-  app.stage.addChild(player);
+  const playerUpper = new Sprite(gunmanUpperTexture);
+  playerUpper.anchor.set(0.3, 0.65);
+  playerContainer.addChild(playerUpper);
 
   // Handle window resizing to keep player at bottom-left
   window.addEventListener('resize', () => {
-    player.position.set(0, app.canvas.height);
+    playerContainer.position.set(50, app.canvas.height);
   });
 
   // Mouse tracking logic for rotation
@@ -46,18 +47,16 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
 
   let mouseX = 0;
   let mouseY = 0;
+  let targetAngle = 0;
 
   app.stage.on('pointermove', (e) => {
     mouseX = e.global.x;
     mouseY = e.global.y;
 
-    // Calculate angle between player and mouse
-    const dx = mouseX - player.x;
-    const dy = mouseY - player.y;
-    const angle = Math.atan2(dy, dx);
-
-    // Set rotation
-    player.rotation = angle;
+    // Calculate target angle between player upper body and mouse
+    const dx = mouseX - playerContainer.x;
+    const dy = mouseY - playerContainer.y;
+    targetAngle = Math.atan2(dy, dx);
   });
 
   // --- LASER OBJECT POOLING ---
@@ -69,7 +68,7 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
     vy: number;
   }
 
-  const LASER_SPEED = 18; // 15 to 20 pixels per frame
+  const LASER_SPEED = 30; // 15 to 20 pixels per frame
   const lasers: Laser[] = [];
 
   // Initialize the laser pool with 50 inactive lasers
@@ -113,31 +112,51 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
     });
   }
 
-  // Spawning system
+  // Spawning system and Game State
   let lastSpawnTime = 0;
-  const spawnInterval = 1000; // Spawn a UFO every 1 second
+  let gameStartTime = performance.now();
+  let gameState = 'playing'; // 'playing' | 'gameover'
+  let phase4SpawnCount = 0;
+  let gameOverTimer = 0;
+
+  const gameOverText = new Text({
+    text: 'Time Up!\nRestarting in 5 seconds...',
+    style: { fill: 0xffffff, align: 'center', fontSize: 36, fontWeight: 'bold' }
+  });
+  gameOverText.anchor.set(0.5);
+  gameOverText.visible = false;
+  app.stage.addChild(gameOverText);
+
+  // Keep game over text centered
+  window.addEventListener('resize', () => {
+    gameOverText.x = app.canvas.width / 2;
+    gameOverText.y = app.canvas.height / 2;
+  });
+  // Initial position
+  gameOverText.x = app.canvas.width / 2;
+  gameOverText.y = app.canvas.height / 2;
 
   // Fire laser on click
   app.stage.on('pointerdown', () => {
     // Find an inactive laser
     const laser = lasers.find(l => !l.active);
-    if (laser) {
+    if (laser && gameState === 'playing') {
       laser.active = true;
       laser.graphics.visible = true;
 
       // Calculate starting position (at the gun barrel, roughly offset by player's rotation)
-      // Since the anchor is (0.2, 0.8), we can estimate the barrel position:
-      const barrelDistance = 100 * player.scale.x; // approximate distance to barrel
-      const startX = player.x + Math.cos(player.rotation) * barrelDistance;
-      const startY = player.y + Math.sin(player.rotation) * barrelDistance;
+      // Since the anchor is (0.3, 0.65), we can estimate the barrel position:
+      const barrelDistance = 100 * playerContainer.scale.x; // approximate distance to barrel
+      const startX = playerContainer.x + Math.cos(playerUpper.rotation) * barrelDistance;
+      const startY = playerContainer.y + Math.sin(playerUpper.rotation) * barrelDistance;
 
       laser.graphics.x = startX;
       laser.graphics.y = startY;
-      laser.graphics.rotation = player.rotation;
+      laser.graphics.rotation = playerUpper.rotation;
 
       // Set velocity
-      laser.vx = Math.cos(player.rotation) * LASER_SPEED;
-      laser.vy = Math.sin(player.rotation) * LASER_SPEED;
+      laser.vx = Math.cos(playerUpper.rotation) * LASER_SPEED;
+      laser.vy = Math.sin(playerUpper.rotation) * LASER_SPEED;
     }
   });
 
@@ -156,18 +175,81 @@ import ufoSvgUrl from './assets/ufo/ufo.svg';
   app.ticker.add((time) => {
     const currentMs = performance.now();
 
+    // Smooth movement for playerUpper
+    playerUpper.rotation += (targetAngle - playerUpper.rotation) * 0.05 * time.deltaTime;
+
+    const elapsedMs = currentMs - gameStartTime;
+
+    // Check game over
+    const noActiveUfos = ufos.every(u => !u.active);
+    if (gameState === 'playing' && (elapsedMs > 180000 || (phase4SpawnCount >= 5 && noActiveUfos))) {
+      gameState = 'gameover';
+      gameOverTimer = currentMs;
+      gameOverText.visible = true;
+    }
+
+    if (gameState === 'gameover') {
+      if (currentMs - gameOverTimer > 5000) {
+        // Restart game
+        gameStartTime = currentMs;
+        phase4SpawnCount = 0;
+        gameState = 'playing';
+        gameOverText.visible = false;
+
+        // Clear all
+        for (const ufo of ufos) {
+          ufo.active = false;
+          ufo.sprite.visible = false;
+        }
+        for (const laser of lasers) {
+          laser.active = false;
+          laser.graphics.visible = false;
+        }
+      }
+    }
+
+    let currentSpawnInterval = 1000;
+    let currentScale = 0.20;
+
+    if (elapsedMs < 90000) {
+      currentSpawnInterval = 1000;
+      currentScale = 0.20;
+    } else if (elapsedMs < 140000) {
+      currentSpawnInterval = 800;
+      currentScale = 0.28;
+    } else if (elapsedMs < 170000) {
+      currentSpawnInterval = 600;
+      currentScale = 0.40;
+    } else {
+      currentSpawnInterval = 1500;
+      currentScale = 0.60;
+    }
+
     // Spawning UFOs
-    if (currentMs - lastSpawnTime > spawnInterval) {
+    if (currentMs - lastSpawnTime > currentSpawnInterval && gameState === 'playing') {
       lastSpawnTime = currentMs;
-      const ufo = ufos.find(u => !u.active);
-      if (ufo) {
-        ufo.active = true;
-        ufo.sprite.visible = true;
-        ufo.sprite.x = app.canvas.width + ufo.sprite.width;
-        // Random Y position, keep it somewhat within the upper/middle screen
-        ufo.sprite.y = Math.random() * (app.canvas.height * 0.7) + 50;
-        // Random speed between 2 and 4 pixels per frame
-        ufo.vx = - (2 + Math.random() * 2);
+
+      let canSpawn = true;
+      if (elapsedMs >= 170000) {
+        if (phase4SpawnCount >= 5) {
+          canSpawn = false;
+        } else {
+          phase4SpawnCount++;
+        }
+      }
+
+      if (canSpawn) {
+        const ufo = ufos.find(u => !u.active);
+        if (ufo) {
+          ufo.active = true;
+          ufo.sprite.visible = true;
+          ufo.sprite.scale.set(currentScale);
+          ufo.sprite.x = app.canvas.width + ufo.sprite.width;
+          // Random Y position, keep it somewhat within the upper/middle screen
+          ufo.sprite.y = Math.random() * (app.canvas.height * 0.7) + 50;
+          // Random speed between 2 and 4 pixels per frame
+          ufo.vx = - (2 + Math.random() * 2);
+        }
       }
     }
 
